@@ -37,7 +37,10 @@ First call the `skill` tool with name `trading-agents-market-analyst` to load yo
 ## Requirements
 
 - **DeepSeek Harness ≥ 0.2.1-rc.2** (the `engines.dsh` range is enforced at install time).
-- **Python 3.10+** with `venv` and `pip` — the plugin creates its own venv the first time it runs.
+- **Python 3.10+** with `venv` and `pip` on `PATH` — the plugin creates its own venv the first time it runs.
+  Do not point the `python` setting at the CPython bundled inside DeepSeek Harness.app: that
+  interpreter is hardened-signed, and macOS library validation makes it refuse to load the
+  extension modules in prebuilt wheels such as numpy, so the venv cannot import `yfinance`.
 - **bash** for the wrapper scripts (macOS, Linux, WSL, or Git Bash on Windows).
 - Network access to PyPI for the first install, and to the data endpoints at runtime
   (Yahoo Finance, Google News, FRED, Polymarket, StockTwits, Reddit, Futu).
@@ -312,7 +315,7 @@ tools stay visible, and each call returns the exact problem to fix.
 | `outputLanguage` | `English` | Report prose language. |
 | `holdingDays` | `5` | Outcome window for settlement. |
 | `benchmark` | auto by suffix | Alpha benchmark symbol. |
-| `python` | `python3` | Interpreter used to create the venv. When unset, the plugin falls back to the CPython that ships with DSH, then `python3` on `PATH`. |
+| `python` | `python3` | Interpreter used to create the venv. Set it when `python3` on `PATH` is older than 3.10. |
 | `autoBootstrap` | `true` | Warm the venv when the plugin activates. |
 | `bootstrapTimeoutMs` | `300000` | Cap on one bootstrap run. |
 | `bootstrapInline` | `false` | Await the warm-up instead of backgrounding it. |

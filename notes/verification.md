@@ -115,6 +115,27 @@ tools to the session workspace, and this was exercised directly:
 - `PYTHONDONTWRITEBYTECODE=1` in the bridge and the wrappers keeps `__pycache__` out
   of the package directory.
 
+## 9. macOS: do not build the venv from the app-bundled CPython
+
+The first Desktop install picked the CPython shipped inside DeepSeek Harness.app
+(`.../runtime/primary-runtime/dependencies/python/bin/python3`, 3.12.14) because
+interpreter resolution preferred the bundled runtime. The bootstrap installed the
+requirements, but importing numpy failed:
+
+```text
+dlopen(.../numpy/_core/_multiarray_umath.cpython-312-darwin.so ...)
+code signature ... not valid for use in process: mapping process and mapped file
+(non-platform) have different Team IDs
+```
+
+The app's interpreter is hardened-signed with library validation enabled, so it refuses
+the ad-hoc-signed extension modules in prebuilt wheels. Fix: `resolvePython` now prefers
+`python` config → `TRADING_AGENTS_PYTHON` → `python3` on `PATH`, and the bundled CPython is
+no longer a default (only an explicit choice). The venv was rebuilt with the system
+Python 3.13 (`yfinance/pandas 3.0.6/numpy 2.5.4 import ok`), and in-session `ta_data
+snapshot NVDA` returned verified OHLCV plus indicators. The README now documents the
+requirement and the trap.
+
 ## Known limits of this verification
 
 - The two `dsh-*-check.mjs` scripts hard-code `/Applications/DeepSeek Harness.app` by

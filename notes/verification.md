@@ -166,6 +166,41 @@ Design consequences recorded in the skill/README:
   states the roster and never invents run-specific names.
 - `subagent` remains the documented fallback when the team tools are absent.
 
+### Capacity finding (v1.2.0)
+
+The first full team-mode run hit `Team member limit 8 reached`: the shipped
+`@deepseek-ai/dsh-experimental-agent-team-profile` bundle mounts
+`@deepseek-ai/dsh-experimental-agent-team` with `maxMembers: 8`, not the documentation
+default of 16. The 13-role roster therefore cannot be created on a stock profile.
+
+Handling, verified live:
+
+- Raise the limit once in the profile's own `cordis.patch.yml` (user layer, applied after
+  every bundle). HMR re-applied the row without restarting the app: a `spawn_teammate` that
+  had just failed with the limit error succeeded immediately after the patch write.
+- The skill now pre-checks `list_agents` for capacity and, when slots are short, reports the
+  shortfall once and dispatches the un-spawnable roles through `subagent` so the run still
+  completes. A limit error is documented as final, never retried.
+- The README and `cordis.patch.yml` carry the exact override snippet.
+
+### Full team-mode acceptance run (MSFT, 2026-10-21)
+
+Executed end to end in the desktop profile after raising `maxMembers` to 24:
+
+- **12/12 roles ran as named teammates**: `ta-market`, `ta-sentiment`, `ta-news`,
+  `ta-fundamentals` in parallel; then `ta-bull` → `ta-bear` (debate), `ta-manager`,
+  `ta-trader`, `ta-aggressive` → `ta-conservative` → `ta-neutral` (risk debate), `ta-pm`.
+- **Task board was the spine**: tasks `task-4`…`task-15`, each with `write_scopes` and
+  `blocked_by` on the previous stage; every task went `pending` → `in_progress` (ownerName =
+  the teammate) → `completed`, and the dependency chain held the ordering without the Lead
+  polling files.
+- **No role failed and no absence marker was needed**; every output file is non-empty.
+- **Artifacts**: `complete_report.md` 220 KB / `complete_report.html` 279 KB (no external
+  scripts, stylesheets or images), `meta.json` with `missing_sections: []`,
+  `plugin_version 1.2.0`, and one pending memory entry for MSFT.
+- **Wall clock**: 23:18 → 23:34 for the full 12-role run (≈16 min), including a live
+  `maxMembers` override mid-run.
+
 ## Known limits of this verification
 
 - The two `dsh-*-check.mjs` scripts hard-code `/Applications/DeepSeek Harness.app` by

@@ -25,6 +25,11 @@ indicators, fundamentals, news, macro, prediction-market odds, social sentiment)
   Results dir default `${TRADING_AGENTS_RESULTS_DIR:-$PWD/.trading-agents/runs}`.
 - A first `ta` call may spend about a minute bootstrapping the venv. If it fails, run
   `"$TA" doctor` and report the error; never fall back to another Python.
+- **Capacity.** The roster needs 13 teammate slots and the shipped agent-team bundle sets
+  `maxMembers: 8`. Check `list_agents` before dispatch: if fewer slots are free than this
+  run needs, tell the user once to raise `maxMembers` (profile patch in
+  `references/steps.md`) and dispatch the roles that cannot be spawned with the `subagent`
+  tool, so the run still completes.
 
 ## Inputs
 
@@ -48,7 +53,8 @@ If `TICKER` is missing, ask and stop; everything else has a default. Accept `key
 
 1. **Reuse before creating.** Names are permanent and never reused for a different member,
    so the team is created once per session. Call `list_agents`; `spawn_teammate`
-   (`context: "fresh"`) only missing roles, `send_message` existing ones.
+   (`context: "fresh"`) only missing roles, `send_message` existing ones. A
+   member-limit error is final: never retry it — use the `subagent` fallback for that role.
 2. **One shared task per role per run.** Create a stage's tasks with `team_task_create`
    (subject, description, `write_scopes`, `blocked_by` on the previous stage) before
    dispatching; every dispatch names its task id.

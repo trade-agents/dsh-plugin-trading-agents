@@ -49,6 +49,23 @@ First call the `skill` tool with name `trading-agents-market-analyst` to load yo
 - **Agent-team tools** for the default team mode: mount
   `@deepseek-ai/dsh-experimental-agent-team-profile` in the profile (the shipped `desktop`
   profile does). Without them the pipeline falls back to the `subagent` tool.
+- **Team capacity for the full roster.** The roster is 13 teammates, but the shipped
+  agent-team bundle sets `maxMembers: 8`. Raise it once in the profile's own
+  `cordis.patch.yml` (HMR applies it without a restart; a fresh session is still the cleanest
+  way to get an empty roster):
+
+  ```yaml
+  - id: agent-team
+    name: '@deepseek-ai/dsh-experimental-agent-team'
+    config:
+      maxMembers: 24
+      maxTasks: 256
+      maxMessageBytes: 65536
+      disposalTimeoutMs: 5000
+  ```
+
+  With the default limit the pipeline still runs: it reports the capacity shortfall once and
+  dispatches the roles it cannot spawn through `subagent`.
 - Network access to PyPI for the first install, and to the data endpoints at runtime
   (Yahoo Finance, Google News, FRED, Polymarket, StockTwits, Reddit, Futu).
 - No API keys, and no dependency on the TradingAgents Python project.
@@ -193,9 +210,10 @@ a labelled gap, never estimated.
   `write_scopes` and `blocked_by` dependencies; the teammate claims it, writes its file, and
   completes it. The board is the durable record of what ran, and its revision checks stop two
   workers from overwriting each other.
-- **Capacity.** The shipped team limit is 16 members; the roster is 13 teammates plus the
-  Lead, so a profile with the default limit fits the whole desk. Names burned by a failed
-  creation still count toward that limit.
+- **Capacity.** The shipped team bundle mounts `maxMembers: 8`, while the roster is 13
+  teammates; the README's install notes show the one-line profile override to 24. Names
+  burned by a failed creation still count toward the limit, and a limit error is final — the
+  pipeline then dispatches the remaining roles through `subagent`.
 - **Parallel vs sequential.** Analysts are dispatched in one tool block (parallel); every
   debate turn waits for the previous task to complete (sequential).
 

@@ -423,6 +423,27 @@ Report, in the user's language:
 
 Do not paste the full reports into the answer. Offer the complete report path.
 
+## Capacity: the 8-member default
+
+The shipped `@deepseek-ai/dsh-experimental-agent-team-profile` bundle mounts the team with
+`maxMembers: 8`, while this roster needs 13 teammate slots. Raise it once in the profile's
+own `cordis.patch.yml` (the user layer, applied after every bundle; HMR recomposes without a
+restart):
+
+```yaml
+- id: agent-team
+  name: '@deepseek-ai/dsh-experimental-agent-team'
+  config:
+    maxMembers: 24
+    maxTasks: 256
+    maxMessageBytes: 65536
+    disposalTimeoutMs: 5000
+```
+
+Check `list_agents` before the first dispatch. If the free slots are fewer than this run
+needs, say so once and dispatch the un-spawnable roles with the `subagent` tool below; a
+`Team member limit N reached` error is final, never retried.
+
 ## Fallback when team tools are unavailable
 
 If the profile does not mount the agent-team tools, replace each dispatch with the

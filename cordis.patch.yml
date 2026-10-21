@@ -34,3 +34,21 @@
         holdingDays: 5
         autoBootstrap: true
         exposeRoleSkills: true
+
+# Team mode requirement
+# ---------------------
+# The pipeline coordinates its roles as DSH agent-team teammates. That needs the
+# team tools mounted (`@deepseek-ai/dsh-experimental-agent-team-profile`) and enough
+# teammate slots for the 13-role roster. The shipped team bundle sets
+# `maxMembers: 8`; raise it in the PROFILE's own patch (user layer), not here:
+#
+#   - id: agent-team
+#     name: '@deepseek-ai/dsh-experimental-agent-team'
+#     config:
+#       maxMembers: 24
+#       maxTasks: 256
+#       maxMessageBytes: 65536
+#       disposalTimeoutMs: 5000
+#
+# Without that override the pipeline reports the shortfall once and runs the roles it
+# cannot spawn through the `subagent` tool.

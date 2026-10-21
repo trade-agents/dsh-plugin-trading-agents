@@ -1,0 +1,52 @@
+{
+  "name": "dsh-plugin-trading-agents",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Multi-agent equity research and trading decision pipeline for DeepSeek Harness: four analysts, a bull/bear debate, research manager, trader, three risk analysts, and a portfolio manager, with standalone keyless market data, a shared memory log, and readable Markdown + HTML reports.",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "trading",
+    "equities",
+    "research",
+    "multi-agent",
+    "finance",
+    "portfolio"
+  ],
+  "author": {
+    "name": "TradingAgents Plugin Contributors"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/trade-agents/trading-agents-plugin",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "roles",
+    "skills",
+    "scripts",
+    "cordis.patch.yml",
+    "locale",
+    "icon.svg",
+    "requirements.txt",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20",
+    "dsh": ">=0.2.1-rc.2 <0.3.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "test": "node test/smoke.js"
+  }
+}

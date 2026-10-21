@@ -1,0 +1,36 @@
+# The trading-agents bundle patch.
+#
+# Installed into a dsh profile, this inserts one plugin row into the profile's
+# loader tree. The row registers the `ta_*` tools and the trading-agents skills
+# (`/trading-agents-pipeline`, `/trading-agents-trade`,
+# `/trading-agents-settle-decisions`, plus thirteen model-only role skills).
+#
+# A patch replaces the targeted row's whole `config`, so restate the complete
+# block here. The user's own profile cordis.patch.yml is applied after every
+# bundle layer and can override any of these fields by id.
+#
+# Every field is optional; the values below are the defaults.
+#
+#   home                 Python venv / memory log / launchers
+#                        default: $TRADING_AGENTS_HOME, else $DSH_HOME/trading-agents
+#   resultsDir           run directories, default: <workspace>/.trading-agents/runs
+#                        (inside the workspace because DSH confines the agent's
+#                        bash and write tools there)
+#   outputLanguage       report prose language, default: English
+#   holdingDays          settlement window, default: 5
+#   benchmark            alpha benchmark, default: auto by exchange suffix
+#   python               interpreter used to create the venv, default: python3
+#   autoBootstrap        warm the venv when the plugin activates, default: true
+#   bootstrapTimeoutMs   cap on one bootstrap, default: 300000
+#   bootstrapInline      await the warm-up instead of backgrounding it, default: false
+#   exposeRoleSkills     register the thirteen role skills, default: true
+#   env                  extra environment variables for the Python layer
+
+- insert:
+    - id: trading-agents
+      name: 'dsh-plugin-trading-agents'
+      config:
+        outputLanguage: English
+        holdingDays: 5
+        autoBootstrap: true
+        exposeRoleSkills: true

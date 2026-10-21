@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Entry point for plugin agents and skills: bootstrap, then run ta_data.py.
+set -euo pipefail
+
+# Resolve this script through symlinks so the wrapper also works when it is
+# linked into a DSH bin directory. macOS readlink has no -f, so try it only
+# when it is supported and fall back to a portable bash loop.
+resolve_self() {
+  local target="${BASH_SOURCE[0]}" dir link
+  if command -v readlink >/dev/null 2>&1 && readlink -f "$target" >/dev/null 2>&1; then
+    readlink -f "$target"
+    return 0
+  fi
+  while [ -L "$target" ]; do
+    dir="$(cd -P "$(dirname "$target")" && pwd)"
+    link="$(readlink "$target")"
+    case "$link" in
+      /*) target="$link" ;;
+      *) target="$dir/$link" ;;
+    esac
+  done
+  printf '%s\n' "$(cd -P "$(dirname "$target")" && pwd)/$(basename "$target")"
+}
+
+SELF="$(resolve_self)"
+HERE="$(cd -P "$(dirname "$SELF")" && pwd)"
+ROOT="$(cd -P "$HERE/.." && pwd)"
+DSH_HOME="${DSH_HOME:-$HOME/.dsh}"
+DATA="${TRADING_AGENTS_HOME:-$DSH_HOME/trading-agents}"
+
+export PYTHONDONTWRITEBYTECODE=1
+"$ROOT/scripts/bootstrap.sh"
+exec "$DATA/venv/bin/python" "$ROOT/scripts/ta_data.py" "$@"

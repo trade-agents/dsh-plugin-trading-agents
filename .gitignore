@@ -6,3 +6,4 @@ bootstrap.log
 .verify/
 node_modules/
 .trading-agents/
+.pnpm-store/

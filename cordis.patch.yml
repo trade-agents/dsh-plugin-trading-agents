@@ -56,3 +56,16 @@
 #
 # Without that override the pipeline reports the shortfall once and runs the roles it
 # cannot spawn through the `subagent` tool.
+#
+# Concurrency: the shipped subagent service caps simultaneously executing children at 8
+# (`maxActiveSubagents`). Raise it in the same profile patch so a whole analyst batch can
+# run at once:
+#
+#   - id: subagent
+#     name: '@deepseek-ai/dsh-subagent'
+#     config:
+#       maxActiveSubagents: 24
+#       maxDepth: 3
+#
+# `maxDepth` is the delegation-depth cap (default 1); raise it only when teammates should
+# delegate further.

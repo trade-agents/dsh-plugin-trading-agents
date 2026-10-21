@@ -203,6 +203,16 @@ Handling, verified live:
   completes. A limit error is documented as final, never retried.
 - The README and `cordis.patch.yml` carry the exact override snippet.
 
+### Concurrency: 24 agents at once
+
+The shipped `@deepseek-ai/dsh-subagent` row caps simultaneously executing children at
+`maxActiveSubagents: 8`. Raising it to 24 in the profile's user layer took effect without a
+restart (the field is read through a live getter). Verified by starting **10** one-shot
+subagents in a single step: every call returned `started subagent …`, whereas the default of
+8 rejects the ninth with `ACTIVATION_LIMIT_REACHED`. The team roster now has both caps at 24
+(`maxMembers` and `maxActiveSubagents`), so a full analyst batch plus debate turns run
+concurrently instead of queueing.
+
 ### Full team-mode acceptance run (MSFT, 2026-10-21)
 
 Executed end to end in the desktop profile after raising `maxMembers` to 24:

@@ -49,10 +49,11 @@ First call the `skill` tool with name `trading-agents-market-analyst` to load yo
 - **Agent-team tools** for the default team mode: mount
   `@deepseek-ai/dsh-experimental-agent-team-profile` in the profile (the shipped `desktop`
   profile does). Without them the pipeline falls back to the `subagent` tool.
-- **Team capacity for the full roster.** The roster is 13 teammates, but the shipped
-  agent-team bundle sets `maxMembers: 8`. Raise it once in the profile's own
-  `cordis.patch.yml` (HMR applies it without a restart; a fresh session is still the cleanest
-  way to get an empty roster):
+- **Team capacity and concurrency.** Two profile-level limits matter, and the shipped
+  bundles set both below what the desk wants: `agent-team.maxMembers` is 8 (the roster is 13
+  teammates) and `subagent.maxActiveSubagents` is 8 (the number of agents that may execute
+  **simultaneously**). Raise both once in the profile's own `cordis.patch.yml` (the user
+  layer, applied after every bundle; HMR applies both without a restart):
 
   ```yaml
   - id: agent-team
@@ -62,10 +63,19 @@ First call the `skill` tool with name `trading-agents-market-analyst` to load yo
       maxTasks: 256
       maxMessageBytes: 65536
       disposalTimeoutMs: 5000
+
+  - id: subagent
+    name: '@deepseek-ai/dsh-subagent'
+    config:
+      maxActiveSubagents: 24
+      maxDepth: 3
   ```
 
-  With the default limit the pipeline still runs: it reports the capacity shortfall once and
-  dispatches the roles it cannot spawn through `subagent`.
+  `maxActiveSubagents` caps live and materializing children per activation tree (default 8),
+  so 24 lets a whole analyst batch plus debate turns run at once instead of queueing.
+  `maxDepth` is the delegation-depth cap (default 1); raise it only if teammates should
+  delegate further. With the defaults the pipeline still runs: it reports the capacity
+  shortfall once and dispatches the roles it cannot spawn through `subagent`.
 - Network access to PyPI for the first install, and to the data endpoints at runtime
   (Yahoo Finance, Google News, FRED, Polymarket, StockTwits, Reddit, Futu).
 - No API keys, and no dependency on the TradingAgents Python project.
@@ -210,10 +220,11 @@ a labelled gap, never estimated.
   `write_scopes` and `blocked_by` dependencies; the teammate claims it, writes its file, and
   completes it. The board is the durable record of what ran, and its revision checks stop two
   workers from overwriting each other.
-- **Capacity.** The shipped team bundle mounts `maxMembers: 8`, while the roster is 13
-  teammates; the README's install notes show the one-line profile override to 24. Names
-  burned by a failed creation still count toward the limit, and a limit error is final — the
-  pipeline then dispatches the remaining roles through `subagent`.
+- **Capacity and concurrency.** The shipped team bundle mounts `maxMembers: 8` against a
+  13-teammate roster, and `subagent.maxActiveSubagents` defaults to 8 concurrent children.
+  The install notes show the profile overrides to 24 for both. Names burned by a failed
+  creation still count toward `maxMembers`, and a limit error is final — the pipeline then
+  dispatches the remaining roles through `subagent`.
 - **Parallel vs sequential.** Analysts are dispatched in one tool block (parallel); every
   debate turn waits for the previous task to complete (sequential).
 

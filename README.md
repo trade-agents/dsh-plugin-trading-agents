@@ -62,7 +62,10 @@ dsh plugin --profile <profile> add /absolute/path/to/dsh-plugin-trading-agents
 ```
 
 Or ask the agent in a session to install it from the repository URL with the
-`plugin_manager` tool (`action: install_bundle`, `target` set to the git spec).
+`plugin_manager` tool (`action: install_bundle`, `target` set to the git spec). The Web
+Plugins page's Add-plugin dialog takes the same spec. In Desktop, the CLI that can manage
+the initialized Desktop profile ships with the app at
+`/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh`.
 
 ### Into a DSH profile (recommended, from a local checkout)
 

@@ -17,6 +17,10 @@
 #                        (inside the workspace because DSH confines the agent's
 #                        bash and write tools there)
 #   outputLanguage       report prose language, default: English
+#                        accepts names or codes: English/en, Chinese/zh/中文,
+#                        Traditional Chinese/zh-tw, Japanese/ja/日本語, Korean/ko,
+#                        German/de, French/fr, Spanish/es, Portuguese/pt,
+#                        Italian/it, Russian/ru, Arabic/ar, Hindi/hi
 #   holdingDays          settlement window, default: 5
 #   benchmark            alpha benchmark, default: auto by exchange suffix
 #   python               interpreter used to create the venv, default: python3

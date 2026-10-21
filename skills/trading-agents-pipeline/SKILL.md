@@ -25,6 +25,9 @@ indicators, fundamentals, news, macro, prediction-market odds, social sentiment)
   Results dir default `${TRADING_AGENTS_RESULTS_DIR:-$PWD/.trading-agents/runs}`.
 - A first `ta` call may spend about a minute bootstrapping the venv. If it fails, run
   `"$TA" doctor` and report the error; never fall back to another Python.
+- **Report language** is the plugin's `outputLanguage` config, injected into bash as
+  `$DSH_TRADING_AGENTS_OUTPUT_LANGUAGE`; setup uses it by default, `language=<value>`
+  overrides it, and the `ta_run`/`ta_assemble` tools default to the same setting.
 - **Capacity.** The roster needs 13 teammate slots and the shipped agent-team bundle sets
   `maxMembers: 8`. Check `list_agents` before dispatch: if fewer slots are free than this
   run needs, tell the user once to raise `maxMembers` (profile patch in
@@ -43,7 +46,7 @@ user's message:
 | `ANALYSTS` | `market,social,news,fundamentals` | `social` = sentiment. |
 | `DEBATE_ROUNDS` | `1` | Bull+bear turns per round. |
 | `RISK_ROUNDS` | `1` | Aggressive+conservative+neutral turns per round. |
-| `LANGUAGE` | `$TRADING_AGENTS_OUTPUT_LANGUAGE` or English | Report prose language. |
+| `LANGUAGE` | plugin `outputLanguage` (`$DSH_TRADING_AGENTS_OUTPUT_LANGUAGE`) | Report prose language; `language=<value>` overrides for one run. |
 | `PORTFOLIO` | not provided | Free text: holdings, cash, constraints. |
 
 If `TICKER` is missing, ask and stop; everything else has a default. Accept `key=value`

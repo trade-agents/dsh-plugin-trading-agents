@@ -114,7 +114,7 @@ async function checkRejects(label, thunk, fragment) {
 }
 
 /** A minimal stand-in for the DSH tool registry. */
-function fakeContext() {
+function fakeContext(options = {}) {
     const tools = new Map()
     const skills = new Map()
     /** @type {string[]} */
@@ -124,6 +124,7 @@ function fakeContext() {
         skills,
         warnings,
         ctx: {
+            get: options?.shellEnv ? (name) => (name === 'shellEnv' ? options.shellEnv : undefined) : () => undefined,
             logger: {
                 info: () => {},
                 warn: (message) => warnings.push(String(message)),
@@ -290,6 +291,21 @@ check('defaults resolve', () => {
 check('unknown field is rejected', () => checkThrows('unknown', () => resolveConfig({ nope: 1 }), 'unknown config field'))
 check('bad boolean is rejected', () => checkThrows('bool', () => resolveConfig({ autoBootstrap: 'maybe' }), 'must be a boolean'))
 check('bad integer is rejected', () => checkThrows('int', () => resolveConfig({ holdingDays: 0 }), 'greater than or equal to 1'))
+check('output language defaults to English', () => assert.equal(resolveConfig(undefined).outputLanguage, 'English'))
+check('language codes and native names normalize', () => {
+    for (const [input, expected] of [
+        ['zh', 'Chinese'], ['中文', 'Chinese'], ['Chinese', 'Chinese'],
+        ['en', 'English'], ['EN-US', 'English'], ['ja', 'Japanese'], ['日本語', 'Japanese'],
+        ['zh-tw', 'Traditional Chinese'], ['de', 'German'], ['fr', 'French'],
+    ]) {
+        assert.equal(resolveConfig({ outputLanguage: input }).outputLanguage, expected, input)
+    }
+})
+check('an unknown language passes through unchanged', () => {
+    assert.equal(resolveConfig({ outputLanguage: 'Klingon' }).outputLanguage, 'Klingon')
+})
+check('an empty language is rejected', () => checkThrows('lang', () => resolveConfig({ outputLanguage: '   ' }), 'must not be empty'))
+check('an overlong language is rejected', () => checkThrows('lang', () => resolveConfig({ outputLanguage: 'x'.repeat(65) }), 'at most 64'))
 check('env mapping is validated', () => checkThrows('env', () => resolveConfig({ env: { 'bad-name': 'x' } }), 'not a valid environment variable name'))
 check('home precedence: env beats config', () => {
     const previous = process.env.TRADING_AGENTS_HOME
@@ -446,6 +462,9 @@ check('ta_doctor reports checks', () => {
         assert.equal(typeof entry.detail, 'string')
     }
 })
+check('ta_doctor reports the configured output language', () => {
+    assert.equal(doctorValue.outputLanguage, 'English')
+})
 check('ta_doctor render returns ContentBlocks', () => {
     const blocks = doctor.output.render({}, doctorValue)
     assert.ok(Array.isArray(blocks) && blocks.length > 0)
@@ -476,7 +495,28 @@ await checkRejects('ta_data rejects an unknown command', () => dataTool.execute(
 const memory = tools.get('ta_memory')
 await checkRejects('ta_memory rejects an unknown action', () => memory.execute({ action: 'nope' }, {}), 'unknown memory action')
 
-console.log('\n[8] configuration failure degrades safely')
+console.log('\n[8] shell environment contribution')
+const captured = []
+const shellEnvStub = { register: (contribution) => captured.push(contribution) }
+const shellCtx = fakeContext({ shellEnv: shellEnvStub })
+await apply(shellCtx.ctx, { autoBootstrap: false, outputLanguage: 'zh' })
+check('the plugin registers a shell environment contribution', () => assert.equal(captured.length, 1))
+check('the contribution declares the language variable', () => {
+    assert.ok(captured[0].variables.DSH_TRADING_AGENTS_OUTPUT_LANGUAGE)
+    assert.equal(typeof captured[0].variables.DSH_TRADING_AGENTS_OUTPUT_LANGUAGE.description, 'string')
+})
+check('the contribution resolves the configured language', () => {
+    const values = captured[0].resolve()
+    assert.equal(values.DSH_TRADING_AGENTS_OUTPUT_LANGUAGE, 'Chinese')
+    assert.equal(values.DSH_TRADING_AGENTS_HOME, HOME)
+})
+check('the contribution resolves the plugin root and results dir', () => {
+    const values = captured[0].resolve()
+    assert.equal(values.DSH_TRADING_AGENTS_ROOT, PLUGIN_ROOT)
+    assert.ok(values.DSH_TRADING_AGENTS_RESULTS_DIR.endsWith('/runs'))
+})
+
+console.log('\n[9] configuration failure degrades safely')
 const degraded = fakeContext()
 await apply(degraded.ctx, { nonsense: true, autoBootstrap: false })
 check('tools still register with a broken config', () => assert.equal(degraded.tools.size, 5))
@@ -484,7 +524,7 @@ check('a broken config is reported, not thrown at load', () => assert.ok(degrade
 const degradedDoctor = degraded.tools.get('ta_doctor')
 await checkRejects('a broken-config tool call explains the fix', () => degradedDoctor.execute({}, {}), 'plugin config is invalid')
 
-console.log('\n[9] live data (opt-in)')
+console.log('\n[10] live data (opt-in)')
 if (LIVE && existsSync(join(HOME, 'venv', 'bin', 'python'))) {
     const dataTool = tools.get('ta_data')
     const today = await dataTool.execute({ command: 'today' }, {})
@@ -561,7 +601,7 @@ if (LIVE && existsSync(join(HOME, 'venv', 'bin', 'python'))) {
     console.log('  --   skipped (set DSH_TEST_TRADING_AGENTS_LIVE=1 with a bootstrapped venv)')
 }
 
-console.log('\n[10] workspace hygiene')
+console.log('\n[11] workspace hygiene')
 check('no __pycache__ is shipped', () => {
     const found = []
     for (const directory of ['roles', 'lib', 'skills', 'scripts', 'test']) {

@@ -36,6 +36,10 @@ meant to survive across runs.
 - The DSH equivalent of the Claude Code SessionStart bootstrap is the plugin's
   activation-time warm-up. If a first `ta` call fails, run `"$TA" doctor` and report the
   error; never fall back to another Python.
+- **Report language** comes from the plugin's `outputLanguage` config, which the plugin
+  injects as `$DSH_TRADING_AGENTS_OUTPUT_LANGUAGE` (falling back to
+  `$TRADING_AGENTS_OUTPUT_LANGUAGE`, then `English`). The setup block reads it; a per-run
+  `language=<value>` overrides it for one run only.
 - Pass **paths**, never report bodies. Do not `cat` a report into a dispatch.
 - Every dispatch begins with the literal role-load line (substitute the real role name,
   e.g. `trading-agents-market-analyst`):
@@ -61,7 +65,7 @@ distinguishes crypto from stock. Keep exchange suffixes on the ticker.
 DATA="${DSH_TRADING_AGENTS_HOME:-${TRADING_AGENTS_HOME:-${DSH_HOME:-$HOME/.dsh}/trading-agents}}"
 TA="$DATA/bin/ta"; TA_ASSEMBLE="$DATA/bin/ta-assemble"
 TICKER=NVDA; DATE=2026-10-20; ANALYSTS=market,social,news,fundamentals
-DEBATE_ROUNDS=1; RISK_ROUNDS=1; LANGUAGE=English
+DEBATE_ROUNDS=1; RISK_ROUNDS=1; LANGUAGE="${DSH_TRADING_AGENTS_OUTPUT_LANGUAGE:-${TRADING_AGENTS_OUTPUT_LANGUAGE:-English}}"
 ASSET_TYPE=stock
 case "$TICKER" in *-USD) ASSET_TYPE=crypto;; esac
 SAFE=$(printf '%s' "$TICKER" | tr '/ ' '__')

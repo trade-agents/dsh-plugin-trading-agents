@@ -136,7 +136,27 @@ Python 3.13 (`yfinance/pandas 3.0.6/numpy 2.5.4 import ok`), and in-session `ta_
 snapshot NVDA` returned verified OHLCV plus indicators. The README now documents the
 requirement and the trap.
 
-## 10. Agent-team mode (v1.1.0)
+## 10. Configurable output language (v1.3.0)
+
+The plugin's `outputLanguage` config now drives the whole run, not only the Python child
+environment:
+
+- `lib/config.js` normalizes names and codes into canonical language names (`zh`, `中文`,
+  `CN` → `Chinese`; `ja`, `日本語` → `Japanese`; `zh-tw` → `Traditional Chinese`; and so on),
+  passes unknown values through, and rejects empty or over-64-character values.
+- The plugin contributes `DSH_TRADING_AGENTS_OUTPUT_LANGUAGE` to every shell call through
+  `dsh-shell-env`, so the pipeline's bash setup reads the configured language instead of
+  defaulting to English.
+- `ta_run` and `ta_assemble` default to the configured language; per-run `language=<value>`
+  still overrides it, and each run records the language it used in `run.env` and `meta.json`.
+- `ta_doctor` reports the configured language.
+
+Verification: `node test/smoke.js` covers alias normalization, pass-through, rejection, the
+shell-env contribution (declared variable + resolved value), the pipeline setup reading the
+variable, and `ta_doctor` reporting it — 96 assertions, 0 failures; DSH's real validators
+pass 20/20 (tools) and 41/41 (skills).
+
+## 11. Agent-team mode (v1.1.0)
 
 The pipeline was converted from anonymous `subagent` children to a DSH **agent team**: the
 session is the Lead, each desk role is a durable named teammate, and a shared task board

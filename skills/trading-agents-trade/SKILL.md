@@ -23,8 +23,9 @@ Shape: `TICKER [YYYY-MM-DD] [analysts=market,social,news,fundamentals] [debate=N
   (default all four; `social` means sentiment).
 - `debate=N` — bull+bear turns per debate round (default `1`).
 - `risk=N` — aggressive+conservative+neutral turns per risk round (default `1`).
-- `language=...` — report prose language (default `$TRADING_AGENTS_OUTPUT_LANGUAGE` or
-  English).
+- `language=...` — report prose language. Defaults to the plugin's `outputLanguage`
+  config (injected as `$DSH_TRADING_AGENTS_OUTPUT_LANGUAGE`); pass it to override for one
+  run.
 - Anything else in the user's message — holdings, cash, constraints — is the `PORTFOLIO`
   text.
 

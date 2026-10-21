@@ -116,7 +116,7 @@ If the package already resolves from the profile's `node_modules`, add the row t
 - id: trading-agents
   name: dsh-plugin-trading-agents
   config:
-    outputLanguage: English
+    outputLanguage: Chinese          # English | Chinese | 中文 | Japanese | zh | ja | ...
     holdingDays: 5
 ```
 
@@ -338,7 +338,7 @@ tools stay visible, and each call returns the exact problem to fix.
   config:
     home: ''                       # default: $TRADING_AGENTS_HOME, else $DSH_HOME/trading-agents
     resultsDir: ''                 # default: <workspace>/.trading-agents/runs
-    outputLanguage: English
+    outputLanguage: Chinese          # English | Chinese | 中文 | Japanese | zh | ja | ...
     holdingDays: 5
     benchmark: ''                  # default: auto by exchange suffix (SPY for US)
     python: ''                     # default: python3 on PATH
@@ -353,7 +353,7 @@ tools stay visible, and each call returns the exact problem to fix.
 | --- | --- | --- |
 | `home` | `$DSH_HOME/trading-agents` | venv, memory log, launchers, bootstrap log. |
 | `resultsDir` | `<workspace>/.trading-agents/runs` | Run directories. Defaults inside the workspace because DSH confines the agent's bash and write tools there. |
-| `outputLanguage` | `English` | Report prose language. |
+| `outputLanguage` | `English` | Report prose language for every report and the run's `LANGUAGE`. Accepts a name or a code: `English`/`en`, `Chinese`/`zh`/`中文`, `Traditional Chinese`/`zh-tw`, `Japanese`/`ja`/`日本語`, `Korean`/`ko`, `German`/`de`, `French`/`fr`, `Spanish`/`es`, `Portuguese`/`pt`, `Italian`/`it`, `Russian`/`ru`, `Arabic`/`ar`, `Hindi`/`hi`; any other string passes through. |
 | `holdingDays` | `5` | Outcome window for settlement. |
 | `benchmark` | auto by suffix | Alpha benchmark symbol. |
 | `python` | `python3` | Interpreter used to create the venv. Set it when `python3` on `PATH` is older than 3.10. |
@@ -372,7 +372,8 @@ directory can be reused.
 | --- | --- | --- |
 | `TRADING_AGENTS_HOME` | `$DSH_HOME/trading-agents` | venv, memory log, launchers, bootstrap log |
 | `TRADING_AGENTS_RESULTS_DIR` | `<workspace>/.trading-agents/runs` | run directories |
-| `TRADING_AGENTS_OUTPUT_LANGUAGE` | `English` | report prose language |
+| `TRADING_AGENTS_OUTPUT_LANGUAGE` | `English` | report prose language for direct CLI use |
+| `DSH_TRADING_AGENTS_OUTPUT_LANGUAGE` | from config | injected into every shell call so skills use the configured language by default |
 | `TRADING_AGENTS_HOLDING_DAYS` | `5` | outcome window for settlement |
 | `TRADING_AGENTS_BENCHMARK` | auto by exchange suffix | alpha benchmark |
 | `TRADING_AGENTS_PYTHON` | `python3` | interpreter used to create the venv |
@@ -382,6 +383,24 @@ directory can be reused.
 
 The memory log is `<home>/memory/trading_memory.md`, in the same markdown format the
 original project uses, so an existing log can be copied in.
+
+### Choosing the output language
+
+Set `outputLanguage` in the plugin row (profile `cordis.patch.yml`, or the bundle's own
+`cordis.patch.yml` default) — that is the only switch a user needs:
+
+```yaml
+- id: trading-agents
+  name: dsh-plugin-trading-agents
+  config:
+    outputLanguage: Chinese
+```
+
+The value is normalized (`zh`, `中文`, `CN`-style inputs become `Chinese`), injected into
+every shell call as `$DSH_TRADING_AGENTS_OUTPUT_LANGUAGE`, and used as the default by the
+pipeline setup, `ta_run`, and `ta_assemble`. A run can still override it for one run with
+`/trading-agents-trade NVDA language=English`, and a historical run keeps the language it
+was started with (it is recorded in `run.env` and `meta.json`).
 
 ### How this interacts with the DSH file sandbox
 

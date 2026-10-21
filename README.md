@@ -6,6 +6,8 @@ decision pipeline:
 **4 analysts in parallel → bull vs. bear debate → research manager → trader →
 aggressive / conservative / neutral risk debate → portfolio manager decision**
 
+This repository: <https://github.com/trade-agents/dsh-plugin-trading-agents>.
+
 It is a port of the [TradingAgents Claude Code plugin](https://github.com/trade-agents/trading-agents-plugin),
 re-implemented against DeepSeek Harness's plugin, skill and tool contracts. It is a
 standalone reimplementation of the [TradingAgents](https://github.com/TauricResearch/TradingAgents)
@@ -46,7 +48,23 @@ resolves from a profile's `node_modules` with no peer packages.
 
 ## Install
 
-### Into a DSH profile (recommended)
+### From this repository
+
+The package is a DSH bundle, so any pnpm-acceptable spec works. From a shell with `dsh`
+on `PATH`:
+
+```bash
+# SSH (the repository is private; git uses the same credentials as `git clone`)
+dsh plugin --profile <profile> add git+ssh://git@github.com/trade-agents/dsh-plugin-trading-agents.git
+
+# or a local checkout
+dsh plugin --profile <profile> add /absolute/path/to/dsh-plugin-trading-agents
+```
+
+Or ask the agent in a session to install it from the repository URL with the
+`plugin_manager` tool (`action: install_bundle`, `target` set to the git spec).
+
+### Into a DSH profile (recommended, from a local checkout)
 
 Ask the agent to install the bundle, or use the Plugins page in the Web UI:
 
@@ -58,12 +76,6 @@ The agent does that with the `plugin_manager` tool, `action: install_bundle`,
 `target` set to the absolute package directory. The bundle patch inserts one row
 (`id: trading-agents`), and the plugin's tools and skills become available in every
 session of that profile.
-
-Or, from a shell with `dsh` on `PATH`:
-
-```bash
-dsh plugin --profile <profile> add /absolute/path/to/dsh-plugin-trading-agents
-```
 
 ### By hand, into a profile's patch
 

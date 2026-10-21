@@ -17,7 +17,7 @@
     "name": "TradingAgents Plugin Contributors"
   },
   "license": "Apache-2.0",
-  "homepage": "https://github.com/trade-agents/trading-agents-plugin",
+  "homepage": "https://github.com/trade-agents/dsh-plugin-trading-agents",
   "main": "lib/index.js",
   "exports": {
     ".": "./lib/index.js",
@@ -48,5 +48,9 @@
   },
   "scripts": {
     "test": "node test/smoke.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/trade-agents/dsh-plugin-trading-agents.git"
   }
 }

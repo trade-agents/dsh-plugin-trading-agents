@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-trading-agents",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "type": "module",
   "description": "Multi-agent equity research and trading decision pipeline for DeepSeek Harness, run as an agent team (Lead + named teammates + shared task board): four analysts, a bull/bear debate, research manager, trader, three risk analysts, and a portfolio manager, with standalone keyless market data, a shared memory log, and readable Markdown + HTML reports.",
   "keywords": [

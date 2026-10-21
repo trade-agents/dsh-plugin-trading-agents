@@ -716,7 +716,13 @@ def macro_text(indicator: str, as_of: str, look_back_days: int | None = None) ->
     try:
         response = SESSION.get(url, timeout=25, headers={"User-Agent": FRED_UA})
         response.raise_for_status()
-        frame = pd.read_csv(io.StringIO(response.text))
+        body = response.text
+        # FRED serves a "Site Maintenance" page (or a throttling page) with HTTP 200
+        # when the CSV endpoint is unavailable; say so instead of reporting a parse error.
+        if body.lstrip()[:512].lower().startswith(("<!doctype", "<html")):
+            return (f"DATA_UNAVAILABLE: FRED returned an HTML page instead of CSV for {series_id} "
+                    f"(site maintenance or request throttling). Retry later; do not fabricate values.")
+        frame = pd.read_csv(io.StringIO(body))
     except (requests.RequestException, ValueError, pd.errors.ParserError) as exc:
         return (f"DATA_UNAVAILABLE: FRED series {series_id} could not be retrieved "
                 f"({type(exc).__name__}). Do not fabricate values.")

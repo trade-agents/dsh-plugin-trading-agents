@@ -201,6 +201,15 @@ Executed end to end in the desktop profile after raising `maxMembers` to 24:
 - **Wall clock**: 23:18 → 23:34 for the full 12-role run (≈16 min), including a live
   `maxMembers` override mid-run.
 
+### FRED outage handling (observed live)
+
+During the MSFT acceptance run every FRED series returned `DATA_UNAVAILABLE`. The endpoint
+was serving a **"Site Maintenance" HTML page with HTTP 200** rather than CSV, so the data
+layer correctly reported the gap instead of estimating. The message now names that cause
+(`FRED returned an HTML page instead of CSV … site maintenance or request throttling`)
+rather than a bare `ParserError`, and the CLI still returns `DATA_UNAVAILABLE` — no value is
+ever fabricated. A maintainer should re-run `ta macro cpi` after the outage to confirm.
+
 ## Known limits of this verification
 
 - The two `dsh-*-check.mjs` scripts hard-code `/Applications/DeepSeek Harness.app` by

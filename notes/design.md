@@ -16,7 +16,7 @@ slash-command entry points.
 | --- | --- |
 | `commands/*.md` (prompt expansion) | **user-invocable runtime skills** (`/trading-agents-trade`, …) |
 | `skills/pipeline/SKILL.md` | runtime skill `trading-agents-pipeline` |
-| `agents/*.md` (13 subagent defs) | runtime **model-invocable-only** skills read from `roles/*.md`, loaded by the child that the orchestrator spawns via the `subagent` tool |
+| `agents/*.md` (13 subagent defs) | runtime **model-invocable-only** skills read from `roles/*.md`, loaded by a durable named teammate (`ta-market` … `ta-pm`) the Lead creates with `spawn_teammate` and dispatches with `send_message`; a shared task board tracks stages, write scopes and dependencies |
 | `hooks/hooks.json` SessionStart → `bootstrap.sh` | plugin `apply()` best-effort warm-up + lazy bootstrap in every tool + `ta_doctor` |
 | `${CLAUDE_PLUGIN_ROOT}/scripts/ta` | `$TRADING_AGENTS_HOME/bin/ta` launcher the plugin writes on activation |
 | `.claude-plugin/plugin.json` | `package.json` (`dsh.bundle.patch`) + `locale/{en,zh}.json` meta + `icon.svg` |

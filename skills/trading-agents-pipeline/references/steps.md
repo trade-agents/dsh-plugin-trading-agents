@@ -1,30 +1,56 @@
-# TradingAgents pipeline — step-by-step reference
+# TradingAgents pipeline — teammate roster and step-by-step wiring
 
-This file holds the exact bash recipes and prompt field lists for
+This file holds the roster, the exact team-tool calls, and the bash recipes for
 `skills/trading-agents-pipeline/SKILL.md`. Read it before step 0. Nothing here is optional;
 the SKILL.md carries the rules, this file carries the wiring.
+
+## Roster
+
+Teammate names are **stable, permanent, and never reused for another member**. Create each
+once per session (`spawn_teammate`) and reuse it on later runs (`send_message`).
+
+| Role key | Teammate | Role skill (loaded by the teammate) | Writes |
+|---|---|---|---|
+| market | `ta-market` | `trading-agents-market-analyst` | `1_analysts/market.md` |
+| sentiment | `ta-sentiment` | `trading-agents-sentiment-analyst` | `1_analysts/sentiment.md` |
+| news | `ta-news` | `trading-agents-news-analyst` | `1_analysts/news.md` |
+| fundamentals | `ta-fundamentals` | `trading-agents-fundamentals-analyst` | `1_analysts/fundamentals.md` |
+| bull | `ta-bull` | `trading-agents-bull-researcher` | `2_research/debate/bull_r<r>.md` |
+| bear | `ta-bear` | `trading-agents-bear-researcher` | `2_research/debate/bear_r<r>.md` |
+| manager | `ta-manager` | `trading-agents-research-manager` | `2_research/manager.md` |
+| trader | `ta-trader` | `trading-agents-trader` | `3_trading/trader.md` |
+| aggressive | `ta-aggressive` | `trading-agents-aggressive-risk-analyst` | `4_risk/debate/aggressive_r<r>.md` |
+| conservative | `ta-conservative` | `trading-agents-conservative-risk-analyst` | `4_risk/debate/conservative_r<r>.md` |
+| neutral | `ta-neutral` | `trading-agents-neutral-risk-analyst` | `4_risk/debate/neutral_r<r>.md` |
+| pm | `ta-pm` | `trading-agents-portfolio-manager` | `5_portfolio/decision.md` |
+| reflector | `ta-reflector` | `trading-agents-memory-reflector` | memory log (no run file) |
+
+The team holds the Lead plus these thirteen names; a profile's `maxMembers` must allow
+them. Do not create a `ta-<ticker>-…` variant: names are not reusable and the roster is
+meant to survive across runs.
 
 ## Conventions used below
 
 - Bash state does **not** persist between calls. Every block re-derives the wrapper paths
   and, from step 0 on, starts from the literal run directory and sources `run.env`.
 - The DSH equivalent of the Claude Code SessionStart bootstrap is the plugin's
-  activation-time warm-up. A first `ta` call may still spend about a minute installing
-  the venv. If it fails, run `"$TA" doctor` and report the error; never fall back to
-  another Python.
-- Delegate roles with the `subagent` tool. The tool returns immediately with a child id;
-  the parent receives a completion notice when the child settles. Never read a child's
-  output file before that notice — it may be stale or absent. A role is loaded by the
-  child through its own skill, so every child prompt begins with the literal line below
-  (substitute the real role name, e.g. `trading-agents-market-analyst`):
+  activation-time warm-up. If a first `ta` call fails, run `"$TA" doctor` and report the
+  error; never fall back to another Python.
+- Pass **paths**, never report bodies. Do not `cat` a report into a dispatch.
+- Every dispatch begins with the literal role-load line (substitute the real role name,
+  e.g. `trading-agents-market-analyst`):
 
   ```
   First call the `skill` tool with name `trading-agents-<role>` to load your role instructions, then follow them exactly.
   ```
 
-- Pass **paths**, never report bodies. Do not `cat` a report into a prompt.
-- Retry a failed or empty role **once** with the same prompt, then write its explicit
-  absence marker (see the per-step sections and the SKILL.md rules).
+- A dispatch always carries the shared task id and ends with:
+
+  ```
+  Shared task: <task-id>. Before writing, claim it (team_task_get, then team_task_update
+  action=claim with its revision). After your file exists, complete it (action=complete).
+  Then send the Lead the short Return block from your role instructions.
+  ```
 
 ## 0. Setup (one bash call)
 
@@ -56,11 +82,16 @@ EOF
   > "$RUN_DIR/6_memory/pending.json"
 : > "$RUN_DIR/2_research/debate/history.md"
 : > "$RUN_DIR/4_risk/debate/history.md"
+cat > "$RUN_DIR/0_context/portfolio.md" <<'EOF'
+Portfolio context: not provided. You do not know the caller's current holdings or cash, so do not assume a flat book; give direction and sizing guidance in terms the caller can apply to their own position.
+EOF
 pwd; echo "$RUN_DIR"
 ```
 
-If `"$TA" identity` fails on the first call because the venv is still bootstrapping, run
-`"$TA" doctor`, report the error, and retry once — do not substitute another Python.
+When the user supplied `PORTFOLIO` text, write that text to `0_context/portfolio.md`
+instead of the default line. A non-zero
+`grep -c '"status": "ready"' "$RUN_DIR/6_memory/pending.json"` means the memory reflector
+joins the analyst batch in step 1; otherwise skip it.
 
 ### Every later bash call starts like this
 
@@ -72,57 +103,58 @@ TA="$DATA/bin/ta"; TA_ASSEMBLE="$DATA/bin/ta-assemble"
 RUN_DIR=/absolute/path/printed/above; . "$RUN_DIR/run.env"
 ```
 
-### Portfolio context
+## Team bootstrap (once per run, before step 1)
 
-Write `$RUN_DIR/0_context/portfolio.md` with the user's `PORTFOLIO` text. When the user
-provided none, write exactly this line:
-
-```bash
-DATA="${DSH_TRADING_AGENTS_HOME:-${TRADING_AGENTS_HOME:-${DSH_HOME:-$HOME/.dsh}/trading-agents}}"
-TA="$DATA/bin/ta"; TA_ASSEMBLE="$DATA/bin/ta-assemble"
-RUN_DIR=/absolute/path/printed/above; . "$RUN_DIR/run.env"
-cat > "$RUN_DIR/0_context/portfolio.md" <<'EOF'
-Portfolio context: not provided. You do not know the caller's current holdings or cash, so do not assume a flat book; give direction and sizing guidance in terms the caller can apply to their own position.
-EOF
+```text
+list_agents()
 ```
 
-### Is settlement due?
+For every role this run needs, compare the roster against that list:
 
-```bash
-DATA="${DSH_TRADING_AGENTS_HOME:-${TRADING_AGENTS_HOME:-${DSH_HOME:-$HOME/.dsh}/trading-agents}}"
-TA="$DATA/bin/ta"; TA_ASSEMBLE="$DATA/bin/ta-assemble"
-RUN_DIR=/absolute/path/printed/above; . "$RUN_DIR/run.env"
-grep -c '"status": "ready"' "$RUN_DIR/6_memory/pending.json" || true
+- **missing** → `spawn_teammate({ name: "ta-market", description: "Market analyst teammate", context: "fresh", prompt: <dispatch> })`
+- **already present** → `send_message({ target: "ta-market", message: <dispatch> })`
+
+The dispatch itself is identical in both cases: the initial prompt is the teammate's first
+task, and a later message is its next. `describe` is a short human label; `name` must be
+exactly one of the roster names.
+
+### Shared task per role
+
+Create the stage's tasks **before** dispatching, so the dispatch can name the task id and
+so dependencies are visible on the board:
+
+```text
+team_task_create({
+  subject: "NVDA 2026-10-21 market report",
+  description: "Write <RUN_DIR>/1_analysts/market.md using the role skill. Field block: TICKER, ANALYSIS_DATE, CONTEXT_PATH, REPORT_PATH, OUTPUT_LANGUAGE.",
+  write_scopes: [".trading-agents/runs/NVDA_20261021_224819/1_analysts/market.md"]
+})
 ```
 
-A non-zero count means the memory reflector joins the analyst batch in step 1; otherwise
-skip it. Do not read `past_context.md` yet — it is refreshed after settlement in step 1.
+Add `blocked_by` with the earlier task ids when a stage needs prior output:
 
-### Run environment for every role
+| Task | `blocked_by` |
+|---|---|
+| each analyst | — |
+| bull | the four analyst tasks |
+| bear | bull |
+| manager | bull, bear |
+| trader | manager |
+| aggressive | trader |
+| conservative | aggressive |
+| neutral | conservative |
+| pm | neutral |
+| reflector | — (independent of the run's stage chain) |
 
-Roles receive `TICKER`, `ANALYSIS_DATE`, `CONTEXT_PATH`, their input report paths, their
-own output path (`REPORT_PATH`, `ARGUMENT_PATH`, `PLAN_PATH`, `PROPOSAL_PATH`, or
-`DECISION_PATH`), and `OUTPUT_LANGUAGE`. `OUTPUT_LANGUAGE` is a full instruction such as
-`Chinese` or `English`; the role writes its prose in it and keeps labelled rating/trade
-lines in English.
+A teammate may claim a task only when everything it depends on is complete, so the board
+enforces the pipeline's ordering in addition to the Lead's own sequencing.
 
 ## 1. Analysts — parallel
 
-Launch **one `subagent` call per selected analyst in a single message**. Use a
-`description` of the form `Market analyst: NVDA 2026-10-20`. Every prompt starts with the
-role-load line.
-
-| Analyst | Role skill | Report file |
-|---|---|---|
-| Market | `trading-agents-market-analyst` | `1_analysts/market.md` |
-| Sentiment | `trading-agents-sentiment-analyst` | `1_analysts/sentiment.md` |
-| News | `trading-agents-news-analyst` | `1_analysts/news.md` |
-| Fundamentals | `trading-agents-fundamentals-analyst` | `1_analysts/fundamentals.md` |
-
-Prompt template — fill every field (`<file>` is the report file from the table):
+Create four tasks (one per selected analyst), then dispatch **all of them in one tool
+block** so they run concurrently. Field block (`<file>` from the roster):
 
 ```
-First call the `skill` tool with name `trading-agents-<role>` to load your role instructions, then follow them exactly.
 TICKER=<TICKER>
 ANALYSIS_DATE=<DATE>
 CONTEXT_PATH=<RUN_DIR>/0_context/instrument_context.md
@@ -131,23 +163,26 @@ OUTPUT_LANGUAGE=<LANGUAGE>
 Write the report in <LANGUAGE>; keep labelled rating/trade lines in English.
 ```
 
-### Memory reflector (same message, only when ready items exist)
-
-Role skill `trading-agents-memory-reflector`:
+Reflector dispatch (same block, only when ready items exist):
 
 ```
-First call the `skill` tool with name `trading-agents-memory-reflector` to load your role instructions, then follow them exactly.
 WORK_DIR=<RUN_DIR>/6_memory
 TICKER=<TICKER>
 Pending results are in <RUN_DIR>/6_memory/pending.json. Run `memory settle --ticker <TICKER>` yourself for fresh figures, and record only entries whose status is ready.
 ```
 
-### Failure handling and absence normalization
+### Wait and normalize
 
-Wait for all completion notices. If an analyst errored or returned without its file, retry
-once with the same prompt. Then normalize every slot — unselected, failed, and empty
-analysts all get the explicit absence marker, so downstream roles never read a missing
-path or mistake absence for an empty finding:
+```text
+wait_agent({ timeout_ms: 120000 })
+list_agents({})
+team_task_list({ status: "completed" })
+```
+
+Repeat the wait/read pair until every analyst task is `completed` or a teammate reported a
+failure; `wait_agent` returns `noProgress` when nothing is running — then check the board
+before waiting again. After the stage, verify and normalize the slots (do not `cat` the
+reports):
 
 ```bash
 DATA="${DSH_TRADING_AGENTS_HOME:-${TRADING_AGENTS_HOME:-${DSH_HOME:-$HOME/.dsh}/trading-agents}}"
@@ -160,13 +195,10 @@ for pair in market:market sentiment:sentiment news:news fundamentals:fundamental
       > "$RUN_DIR/1_analysts/$file.md"
   fi
 done
+ls -l "$RUN_DIR/1_analysts"
 ```
 
-Verify with `ls -l "$RUN_DIR/1_analysts"`; do not `cat` the reports.
-
-### Refresh lessons
-
-Settlement may have just added lessons; refresh the past-context file:
+Refresh the lessons file after settlement may have added entries:
 
 ```bash
 DATA="${DSH_TRADING_AGENTS_HOME:-${TRADING_AGENTS_HOME:-${DSH_HOME:-$HOME/.dsh}/trading-agents}}"
@@ -181,19 +213,13 @@ fi
 
 ## 2. Research debate — sequential
 
-Maintain a running history file. For each round `r` from 1 to `DEBATE_ROUNDS`:
+For each round `r` from 1 to `DEBATE_ROUNDS`: create the bull task (blocked by the analyst
+tasks), dispatch `ta-bull`, wait for its task to complete, append its turn, then create the
+bear task (blocked by bull), dispatch `ta-bear`, wait, append.
 
-1. **Bull** (`trading-agents-bull-researcher`) — `OPPONENT_ARGUMENT` is the latest bear
-   file, or `none` in round 1. `DEBATE_HISTORY` is the history file, or `none` in round 1.
-2. **Bear** (`trading-agents-bear-researcher`) — `OPPONENT_ARGUMENT` is the bull file just
-   written.
-
-Run them strictly one after the other: each turn needs the previous one.
-
-Prompt fields for both roles:
+Prompt fields for both:
 
 ```
-First call the `skill` tool with name `trading-agents-<role>` to load your role instructions, then follow them exactly.
 TICKER=<TICKER>
 ANALYSIS_DATE=<DATE>
 CONTEXT_PATH=<RUN_DIR>/0_context/instrument_context.md
@@ -207,8 +233,7 @@ ARGUMENT_PATH=<RUN_DIR>/2_research/debate/{bull|bear}_r<r>.md
 OUTPUT_LANGUAGE=<LANGUAGE>
 ```
 
-After each turn, append it to the running history (chronological, no token cost). Pass the
-history path rather than its contents:
+After each turn, append it to the running history (chronological, no token cost):
 
 ```bash
 DATA="${DSH_TRADING_AGENTS_HOME:-${TRADING_AGENTS_HOME:-${DSH_HOME:-$HOME/.dsh}/trading-agents}}"
@@ -217,16 +242,16 @@ RUN_DIR=/absolute/path/printed/above; . "$RUN_DIR/run.env"
 cat "$RUN_DIR/2_research/debate/bull_r<r>.md" >> "$RUN_DIR/2_research/debate/history.md"
 ```
 
-Same pattern for the bear turn file. On a failed or empty turn, retry once; if it still
-fails, write `<Bull|Bear> Analyst: (argument unavailable this turn.)` to the turn file,
-append it, and continue.
+Same pattern for the bear turn file. On a failed or empty turn, reopen its task, resend the
+same dispatch once; if it still fails, write
+`<Bull|Bear> Analyst: (argument unavailable this turn.)` to the turn file, append it,
+complete the task with that note, and continue.
 
 ## 3. Research Manager
 
-Role skill `trading-agents-research-manager`.
+Create the manager task (blocked by bull and bear), dispatch `ta-manager`:
 
 ```
-First call the `skill` tool with name `trading-agents-research-manager` to load your role instructions, then follow them exactly.
 TICKER=<TICKER>
 ANALYSIS_DATE=<DATE>
 CONTEXT_PATH=<RUN_DIR>/0_context/instrument_context.md
@@ -252,10 +277,9 @@ for f in "$RUN_DIR"/2_research/debate/bear_r*.md; do cat "$f" >> "$RUN_DIR/2_res
 
 ## 4. Trader
 
-Role skill `trading-agents-trader`.
+Create the trader task (blocked by manager), dispatch `ta-trader`:
 
 ```
-First call the `skill` tool with name `trading-agents-trader` to load your role instructions, then follow them exactly.
 TICKER=<TICKER>
 ANALYSIS_DATE=<DATE>
 CONTEXT_PATH=<RUN_DIR>/0_context/instrument_context.md
@@ -269,18 +293,11 @@ OUTPUT_LANGUAGE=<LANGUAGE>
 ## 5. Risk debate — sequential
 
 For each round `r` from 1 to `RISK_ROUNDS`, run in this fixed order:
-**aggressive → conservative → neutral**.
-
-| Turn | Role skill | File |
-|---|---|---|
-| Aggressive | `trading-agents-aggressive-risk-analyst` | `4_risk/debate/aggressive_r<r>.md` |
-| Conservative | `trading-agents-conservative-risk-analyst` | `4_risk/debate/conservative_r<r>.md` |
-| Neutral | `trading-agents-neutral-risk-analyst` | `4_risk/debate/neutral_r<r>.md` |
+**aggressive → conservative → neutral**, each blocked by the previous turn's task.
 
 Prompt fields (all three):
 
 ```
-First call the `skill` tool with name `trading-agents-<role>` to load your role instructions, then follow them exactly.
 TICKER=<TICKER>
 ANALYSIS_DATE=<DATE>
 CONTEXT_PATH=<RUN_DIR>/0_context/instrument_context.md
@@ -294,7 +311,7 @@ RISK_HISTORY=<RUN_DIR>/4_risk/debate/history.md or none in round 1
 AGGRESSIVE_ARGUMENT=<latest aggressive path or none>
 CONSERVATIVE_ARGUMENT=<latest conservative path or none>
 NEUTRAL_ARGUMENT=<latest neutral path or none>
-ARGUMENT_PATH=<RUN_DIR>/4_risk/debate/<file>
+ARGUMENT_PATH=<RUN_DIR>/4_risk/debate/<aggressive|conservative|neutral>_r<r>.md
 OUTPUT_LANGUAGE=<LANGUAGE>
 ```
 
@@ -312,10 +329,9 @@ Same retry/placeholder rule as the research debate:
 
 ## 6. Portfolio Manager
 
-Role skill `trading-agents-portfolio-manager`.
+Create the pm task (blocked by neutral), dispatch `ta-pm`:
 
 ```
-First call the `skill` tool with name `trading-agents-portfolio-manager` to load your role instructions, then follow them exactly.
 TICKER=<TICKER>
 ANALYSIS_DATE=<DATE>
 CONTEXT_PATH=<RUN_DIR>/0_context/instrument_context.md
@@ -339,10 +355,10 @@ grep -m1 -E '^\*\*Rating\*\*:' "$RUN_DIR/5_portfolio/decision.md" \
 ```
 
 The result must be one of `Buy`, `Overweight`, `Hold`, `Underweight`, `Sell`. If it is not,
-re-run the portfolio manager once with an explicit correction prompt (same fields, plus
-"Your previous decision did not contain a valid `**Rating**:` line; rewrite it with exactly
-one of Buy, Overweight, Hold, Underweight, Sell"). If it is still invalid, use `REVIEW` as
-the rating and say so in the final answer.
+re-dispatch `ta-pm` once with an explicit correction prompt (same fields, plus "Your
+previous decision did not contain a valid `**Rating**:` line; rewrite it with exactly one of
+Buy, Overweight, Hold, Underweight, Sell"). If it is still invalid, use `REVIEW` as the
+rating and say so in the final answer.
 
 Build the risk section files (append order is round order):
 
@@ -407,20 +423,27 @@ Report, in the user's language:
 
 Do not paste the full reports into the answer. Offer the complete report path.
 
+## Fallback when team tools are unavailable
+
+If the profile does not mount the agent-team tools, replace each dispatch with the
+`subagent` tool and the same role-load line plus field block. The task board can still be
+used by the Lead alone for tracking, but teammate claims are skipped. Everything else —
+files, markers, rating validation, assembly, memory store — is identical.
+
 ## Role output map
 
-| Step | Role skill | Output |
+| Step | Teammate | Output |
 |---|---|---|
-| 1 | `trading-agents-market-analyst` | `1_analysts/market.md` |
-| 1 | `trading-agents-sentiment-analyst` | `1_analysts/sentiment.md` |
-| 1 | `trading-agents-news-analyst` | `1_analysts/news.md` |
-| 1 | `trading-agents-fundamentals-analyst` | `1_analysts/fundamentals.md` |
-| 1 | `trading-agents-memory-reflector` | reflections recorded by `memory outcome` |
-| 2 | `trading-agents-bull-researcher` | `2_research/debate/bull_r<r>.md` |
-| 2 | `trading-agents-bear-researcher` | `2_research/debate/bear_r<r>.md` |
-| 3 | `trading-agents-research-manager` | `2_research/manager.md` |
-| 4 | `trading-agents-trader` | `3_trading/trader.md` |
-| 5 | `trading-agents-aggressive-risk-analyst` | `4_risk/debate/aggressive_r<r>.md` |
-| 5 | `trading-agents-conservative-risk-analyst` | `4_risk/debate/conservative_r<r>.md` |
-| 5 | `trading-agents-neutral-risk-analyst` | `4_risk/debate/neutral_r<r>.md` |
-| 6 | `trading-agents-portfolio-manager` | `5_portfolio/decision.md` |
+| 1 | `ta-market` | `1_analysts/market.md` |
+| 1 | `ta-sentiment` | `1_analysts/sentiment.md` |
+| 1 | `ta-news` | `1_analysts/news.md` |
+| 1 | `ta-fundamentals` | `1_analysts/fundamentals.md` |
+| 1 | `ta-reflector` | reflections recorded by `memory outcome` |
+| 2 | `ta-bull` | `2_research/debate/bull_r<r>.md` |
+| 2 | `ta-bear` | `2_research/debate/bear_r<r>.md` |
+| 3 | `ta-manager` | `2_research/manager.md` |
+| 4 | `ta-trader` | `3_trading/trader.md` |
+| 5 | `ta-aggressive` | `4_risk/debate/aggressive_r<r>.md` |
+| 5 | `ta-conservative` | `4_risk/debate/conservative_r<r>.md` |
+| 5 | `ta-neutral` | `4_risk/debate/neutral_r<r>.md` |
+| 6 | `ta-pm` | `5_portfolio/decision.md` |

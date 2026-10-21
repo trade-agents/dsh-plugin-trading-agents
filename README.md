@@ -6,6 +6,10 @@ decision pipeline:
 **4 analysts in parallel → bull vs. bear debate → research manager → trader →
 aggressive / conservative / neutral risk debate → portfolio manager decision**
 
+The pipeline runs as a **DSH agent team**: the session is the Lead, each desk role is a
+durable named teammate (`ta-market`, `ta-bull`, …, `ta-pm`), and a shared task board records
+each stage deliverable with its write scope and dependencies.
+
 This repository: <https://github.com/trade-agents/dsh-plugin-trading-agents>.
 
 It is a port of the [TradingAgents Claude Code plugin](https://github.com/trade-agents/trading-agents-plugin),
@@ -21,14 +25,14 @@ The behaviour is the same; the extension points are not.
 | --- | --- |
 | `commands/*.md` (prompt-expanding slash commands) | **user-invocable runtime skills**: `/trading-agents-trade`, `/trading-agents-settle-decisions`, `/trading-agents-pipeline` |
 | `skills/pipeline/SKILL.md` | `skills/trading-agents-pipeline/SKILL.md` + `references/steps.md` (split because DSH trims tool results above 8192 characters) |
-| `agents/*.md` (13 subagent definitions) | `roles/*.md`, registered as **model-only skills** (`trading-agents-<role>`); the orchestrator spawns a `subagent` and tells it to load its role skill first, so role text never passes through the orchestrator's context |
+| `agents/*.md` (13 subagent definitions) | `roles/*.md`, registered as **model-only skills** (`trading-agents-<role>`); the Lead creates durable named teammates with `spawn_teammate` and dispatches them with `send_message`, each loading its own role skill. A shared task board (`team_task_*`) tracks every stage with `write_scopes` and `blocked_by` dependencies |
 | `hooks/hooks.json` → `SessionStart` bootstrap | the plugin's activation-time warm-up (`autoBootstrap`), plus lazy bootstrap on the first tool call and `ta_doctor` |
 | `${CLAUDE_PLUGIN_ROOT}/scripts/ta` | `$TRADING_AGENTS_HOME/bin/ta` launchers the plugin writes on activation, plus the `ta_*` tools |
 | `.claude-plugin/plugin.json` | `package.json` (`dsh.bundle.patch`) + `locale/{en,zh}.json` display metadata + `icon.svg` |
 | `marketplace.json` | a DSH profile: install the bundle into it (see [Install](#install)) |
 
-`subagent_type: trading-agents:market-analyst` becomes the `subagent` tool with a
-prompt whose first line is:
+`subagent_type: trading-agents:market-analyst` becomes the teammate `ta-market`, dispatched
+with a message whose first line is:
 
 ```text
 First call the `skill` tool with name `trading-agents-market-analyst` to load your role instructions, then follow them exactly.
@@ -42,6 +46,9 @@ First call the `skill` tool with name `trading-agents-market-analyst` to load yo
   interpreter is hardened-signed, and macOS library validation makes it refuse to load the
   extension modules in prebuilt wheels such as numpy, so the venv cannot import `yfinance`.
 - **bash** for the wrapper scripts (macOS, Linux, WSL, or Git Bash on Windows).
+- **Agent-team tools** for the default team mode: mount
+  `@deepseek-ai/dsh-experimental-agent-team-profile` in the profile (the shipped `desktop`
+  profile does). Without them the pipeline falls back to the `subagent` tool.
 - Network access to PyPI for the first install, and to the data endpoints at runtime
   (Yahoo Finance, Google News, FRED, Polymarket, StockTwits, Reddit, Futu).
 - No API keys, and no dependency on the TradingAgents Python project.
@@ -160,21 +167,37 @@ a labelled gap, never estimated.
 
 ## What runs
 
-| Role | Role skill | Writes |
-| --- | --- | --- |
-| Market Analyst | `trading-agents-market-analyst` | `1_analysts/market.md` |
-| Sentiment Analyst | `trading-agents-sentiment-analyst` | `1_analysts/sentiment.md` |
-| News Analyst | `trading-agents-news-analyst` | `1_analysts/news.md` |
-| Fundamentals Analyst | `trading-agents-fundamentals-analyst` | `1_analysts/fundamentals.md` |
-| Bull Researcher | `trading-agents-bull-researcher` | `2_research/debate/bull_rN.md` |
-| Bear Researcher | `trading-agents-bear-researcher` | `2_research/debate/bear_rN.md` |
-| Research Manager | `trading-agents-research-manager` | `2_research/manager.md` |
-| Trader | `trading-agents-trader` | `3_trading/trader.md` |
-| Aggressive Risk Analyst | `trading-agents-aggressive-risk-analyst` | `4_risk/debate/aggressive_rN.md` |
-| Conservative Risk Analyst | `trading-agents-conservative-risk-analyst` | `4_risk/debate/conservative_rN.md` |
-| Neutral Risk Analyst | `trading-agents-neutral-risk-analyst` | `4_risk/debate/neutral_rN.md` |
-| Portfolio Manager | `trading-agents-portfolio-manager` | `5_portfolio/decision.md` |
-| Memory Reflector | `trading-agents-memory-reflector` | memory log |
+| Role | Teammate | Role skill | Writes |
+| --- | --- | --- | --- |
+| Market Analyst | `ta-market` | `trading-agents-market-analyst` | `1_analysts/market.md` |
+| Sentiment Analyst | `ta-sentiment` | `trading-agents-sentiment-analyst` | `1_analysts/sentiment.md` |
+| News Analyst | `ta-news` | `trading-agents-news-analyst` | `1_analysts/news.md` |
+| Fundamentals Analyst | `ta-fundamentals` | `trading-agents-fundamentals-analyst` | `1_analysts/fundamentals.md` |
+| Bull Researcher | `ta-bull` | `trading-agents-bull-researcher` | `2_research/debate/bull_rN.md` |
+| Bear Researcher | `ta-bear` | `trading-agents-bear-researcher` | `2_research/debate/bear_rN.md` |
+| Research Manager | `ta-manager` | `trading-agents-research-manager` | `2_research/manager.md` |
+| Trader | `ta-trader` | `trading-agents-trader` | `3_trading/trader.md` |
+| Aggressive Risk Analyst | `ta-aggressive` | `trading-agents-aggressive-risk-analyst` | `4_risk/debate/aggressive_rN.md` |
+| Conservative Risk Analyst | `ta-conservative` | `trading-agents-conservative-risk-analyst` | `4_risk/debate/conservative_rN.md` |
+| Neutral Risk Analyst | `ta-neutral` | `trading-agents-neutral-risk-analyst` | `4_risk/debate/neutral_rN.md` |
+| Portfolio Manager | `ta-pm` | `trading-agents-portfolio-manager` | `5_portfolio/decision.md` |
+| Memory Reflector | `ta-reflector` | `trading-agents-memory-reflector` | memory log |
+
+### Team lifecycle
+
+- **Create once, reuse forever.** Teammate names are permanent and a name is never reused
+  for a different member, so the first run calls `spawn_teammate` for the roles it needs and
+  every later run only calls `send_message`. The pipeline checks `list_agents` first, so it
+  never tries to create an existing name.
+- **Task board.** Before each stage the Lead creates a shared task with the role's
+  `write_scopes` and `blocked_by` dependencies; the teammate claims it, writes its file, and
+  completes it. The board is the durable record of what ran, and its revision checks stop two
+  workers from overwriting each other.
+- **Capacity.** The shipped team limit is 16 members; the roster is 13 teammates plus the
+  Lead, so a profile with the default limit fits the whole desk. Names burned by a failed
+  creation still count toward that limit.
+- **Parallel vs sequential.** Analysts are dispatched in one tool block (parallel); every
+  debate turn waits for the previous task to complete (sequential).
 
 Output tree:
 
@@ -427,9 +450,13 @@ notes/                    port design and per-workstream deviation notes
 
 - **Slash commands are skills.** DSH has no prompt-expanding command file; a
   user-invocable skill is the equivalent surface. Input arrives as ordinary message text.
-- **Roles are skills, not agent definitions.** DSH's `subagent` tool takes a prompt, not
-  an `agent_type`. The orchestrator passes a fixed first line that makes the child load
-  its role skill, which keeps role instructions out of the orchestrator's context.
+- **Roles are teammates that load skills.** DSH has no `agent_type`; the Lead creates a
+  named teammate per role and dispatches a task whose first line makes the teammate load its
+  role skill. Role instructions therefore stay out of the Lead's context, and teammates are
+  durable across runs instead of being re-created each time.
+- **Team mode is the default; `subagent` is the fallback.** If the profile does not mount
+  the agent-team tools, the same dispatches go through `subagent` with an identical role-load
+  line and field block.
 - **The pipeline skill is split.** DSH trims tool results above 8192 characters, so the
   full bash recipes live in `skills/trading-agents-pipeline/references/steps.md` and are
   read on demand.

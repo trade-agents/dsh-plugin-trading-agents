@@ -1,6 +1,6 @@
 ---
 name: trading-agents-settle-decisions
-description: Settle past TradingAgents decisions whose holding window has traded — run memory settle, spawn the memory reflector for ready items, and report settled, waiting, and failed counts.
+description: Settle past TradingAgents decisions whose holding window has traded — run memory settle, dispatch the memory-reflector teammate for ready items, and report settled, waiting, and failed counts.
 whenToUse: Use when the user asks to settle due decisions, update reflections, or check what the memory log is waiting on.
 user-invocable: true
 ---
@@ -47,28 +47,39 @@ cat "$WORK_DIR/pending.json"
 Each item's `status` is `ready` (the full holding window has traded), `waiting` (not yet),
 or `failed` (prices unreadable). Count each status from the JSON.
 
-## 3. Spawn the memory reflector when anything is ready
+## 3. Dispatch the memory reflector when anything is ready
 
-If at least one item has `"status": "ready"`, spawn the memory reflector with the
-`subagent` tool:
+The reflector is the durable teammate `ta-reflector` (role skill
+`trading-agents-memory-reflector`). Teammate names are permanent, so check the roster with
+`list_agents`: call `spawn_teammate` only when the name is missing, and `send_message` when
+it already exists. The dispatch is the same text either way.
 
-- Role skill: `trading-agents-memory-reflector`.
-- `description`: `Memory reflector: settle <ticker or all>`.
-- Child prompt — begin with the literal role-load line:
+Create the shared task first so the board records the work:
+
+```
+team_task_create({
+  subject: "Settle due TradingAgents decisions (<ticker or all>)",
+  description: "Write 2-4 sentence reflections for ready items and record their outcomes in the memory log."
+})
+```
+
+Then dispatch (the initial prompt when spawning, the message when reusing):
 
 ```
 First call the `skill` tool with name `trading-agents-memory-reflector` to load your role instructions, then follow them exactly.
 WORK_DIR=<WORK_DIR>
 TICKER=<ticker or "all">
 Pending results are in <WORK_DIR>/pending.json. Run `memory settle` yourself if you need fresh figures, and record only entries whose status is ready.
+Shared task: <task-id>. Claim it before writing (team_task_get, then team_task_update action=claim with its revision); complete it (action=complete) once your reflections are recorded. Then send the Lead the short Return block from your role instructions.
 ```
 
-The `subagent` tool returns immediately with a child id; the parent gets a completion
-notice when the child settles. Do not read the reflector's output files or claim results
-before that notice. If the child fails, retry once with the same prompt; if it fails again,
-report the failure instead of inventing reflections.
+Call `wait_agent`, then re-read `list_agents` and `team_task_list`; repeat until the task is
+`completed` or the reflector reports a failure. On a failed or empty run, reopen the task and
+resend the same dispatch once; if it still fails, report the failure instead of inventing
+reflections. Never read or claim results before the task completes. Without the team tools,
+fall back to the `subagent` tool with the same role-load line.
 
-If no item is ready, do not spawn anything: say how many are waiting and how many failed,
+If no item is ready, do not dispatch anything: say how many are waiting and how many failed,
 with the failure reasons when the JSON provides them, and stop.
 
 ## 4. Report

@@ -136,6 +136,36 @@ Python 3.13 (`yfinance/pandas 3.0.6/numpy 2.5.4 import ok`), and in-session `ta_
 snapshot NVDA` returned verified OHLCV plus indicators. The README now documents the
 requirement and the trap.
 
+## 10. Agent-team mode (v1.1.0)
+
+The pipeline was converted from anonymous `subagent` children to a DSH **agent team**: the
+session is the Lead, each desk role is a durable named teammate, and a shared task board
+records every stage with `write_scopes` and `blocked_by` dependencies.
+
+Validated live in the desktop profile (which mounts
+`@deepseek-ai/dsh-experimental-agent-team-profile`):
+
+1. `team_task_create` produced `task-3` (write scope = the market report path).
+2. `spawn_teammate` created `ta-market` (`context: fresh`) with the dispatch: role-load
+   line + field block + task id + claim/complete instructions.
+3. The teammate loaded `trading-agents-market-analyst` through the `skill` tool, called
+   `team_task_get` then `team_task_update action=claim` (revision 1 → `in_progress`,
+   `ownerName: ta-market`), wrote a 23.8 KB Chinese report, completed the task (revision 3),
+   and sent the Lead its Return block.
+4. `wait_agent` woke on each membership/task change; it returned the documented
+   `noProgress` (`no-active-peer`) once the teammate went inactive.
+5. `send_message` to the now-inactive `ta-market` resumed it for a reuse check, which
+   answered with its name, role skill and completed task id and wrote nothing.
+
+Design consequences recorded in the skill/README:
+
+- Names are permanent and never reusable, so the roster is created once per session and
+  every later run only sends messages (`list_agents` gates create vs reuse).
+- The shipped `maxMembers` is 16 and the roster is 13 teammates + the Lead, so a session
+  that already holds other teammates may need free slots or a raised limit; the skill
+  states the roster and never invents run-specific names.
+- `subagent` remains the documented fallback when the team tools are absent.
+
 ## Known limits of this verification
 
 - The two `dsh-*-check.mjs` scripts hard-code `/Applications/DeepSeek Harness.app` by
